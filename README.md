@@ -14,7 +14,9 @@ Validate and Inventory run in parallel. Charge waits for both. Save fails in the
 - Catalyst mode: [current Diagrid CLI](https://docs.diagrid.io/getting-started/install-cli/), a Catalyst account, and `diagrid login`.
 - Optional: Python 3 for verification; PowerShell 7.1+ for Catalyst setup.
 
-## Run locally
+## Run locally (default)
+
+Diagrid is disabled by default (`"Enabled": false` in `AppHost/appsettings.json`). No Diagrid login or connection settings are needed for local testing. Run these commands from the repository root:
 
 ```bash
 dotnet build ParallelRerunRepro.slnx
@@ -32,20 +34,30 @@ For the Inventory rerun, Load request is reused; Validate, Inventory, Charge, an
 
 ## Run against Catalyst
 
-Stop the local AppHost first. After building and logging in:
+Enable Diagrid only when you want to test against its managed workflow engine:
 
-```powershell
-pwsh ./scripts/setup-catalyst.ps1
-```
-
-The script creates or reuses the `parallel-rerun-repro` project and app in your selected organization and default region. Use `-ProjectName` or `-Region` to override, or `-WhatIf` to preview.
+1. Stop the local AppHost (`Ctrl+C`). Install a [current Diagrid CLI](https://docs.diagrid.io/getting-started/install-cli/) on PATH and run `diagrid login` with your account.
+2. In **`AppHost/appsettings.json`**, set `Diagrid:Enabled` to `true`.
+3. Save your organization and project in **AppHost user secrets**:
 
 ```bash
-dotnet run --project AppHost --launch-profile http --no-build -- \
-  --UseCatalyst=true --CatalystProject=parallel-rerun-repro
+dotnet user-secrets set "Diagrid:Organization" "your-organization-name-or-id" --project AppHost
+dotnet user-secrets set "Diagrid:Project" "your-existing-project" --project AppHost
 ```
 
-Use the same demo page. Aspire runs the local worker through `diagrid dev run`, without a local sidecar. Open the rerun instance in Catalyst and compare the graph with the worker’s execution evidence. The reported case is Validate appearing dimmed despite executing again; confirm the graph behavior in Catalyst itself.
+Find your organization with `diagrid org list`. Your account must have access to the project, with managed workflows enabled. In Rider, right-click the **AppHost project → Manage User Secrets** to edit these values. The `http` launch profile loads them automatically. Leave Aspire-generated entries unchanged.
+
+Run the same build/start commands shown above, then use [the demo](http://localhost:5260). The worker and Aspire stay local; workflow execution and history use Diagrid. No API token needs to be copied.
+
+AppHost selects the configured organization in the CLI and creates or reuses the `parallel-rerun-repro` app. A missing project can also be created. To provision one explicitly:
+
+```powershell
+pwsh ./scripts/setup-catalyst.ps1 -Organization your-org -ProjectName your-project
+```
+
+The setup script takes parameters only; it does not read appsettings or user secrets. Add `-WhatIf` to preview, `-Region` to choose a region, or `-AppId` to provision another app. For this demo, keep the default app name `parallel-rerun-repro`.
+
+Compare Catalyst’s graph with Aspire logs and traces. Remote runtime spans depend on Diagrid’s tracing configuration. To return to local Dapr, stop AppHost, set `Diagrid:Enabled` back to `false`, and start it again.
 
 ![Catalyst graph after rerun from Inventory](docs/catalyst-rerun-graph.png)
 

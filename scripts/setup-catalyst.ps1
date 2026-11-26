@@ -5,21 +5,28 @@
 Creates or reuses a Catalyst project and app for the plain-Dapr reproduction.
 .DESCRIPTION
 Install the current Diagrid CLI: https://docs.diagrid.io/getting-started/install-cli/
-Run diagrid login and select the intended organization first.
+Run diagrid login first. Organization and project are supplied as parameters.
+This script does not read appsettings or user secrets.
 This provisions cloud resources; it does not create API keys or store credentials.
 .EXAMPLE
-pwsh ./scripts/setup-catalyst.ps1
+pwsh ./scripts/setup-catalyst.ps1 -Organization your-org -ProjectName your-project
 .EXAMPLE
-pwsh ./scripts/setup-catalyst.ps1 -ProjectName your-project-name
+pwsh ./scripts/setup-catalyst.ps1 -Organization your-org -ProjectName your-project -WhatIf
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [string] $ProjectName = 'parallel-rerun-repro',
+    [Parameter(Mandatory)]
+    [ValidateNotNullOrEmpty()]
+    [string] $Organization,
+    [Parameter(Mandatory)]
+    [ValidateNotNullOrEmpty()]
+    [string] $ProjectName,
     [string] $AppId = 'parallel-rerun-repro',
     [string] $Region
 )
 
 $ErrorActionPreference = 'Stop'
+
 if ($null -eq (Get-Command diagrid -ErrorAction SilentlyContinue)) {
     throw 'Install Diagrid CLI from https://docs.diagrid.io/getting-started/install-cli/ and add it to PATH.'
 }
@@ -48,6 +55,7 @@ function Invoke-Diagrid([string[]] $Arguments) {
 }
 
 if ($PSCmdlet.ShouldProcess($ProjectName, 'Configure Catalyst project and app') -eq $false) { return }
+Invoke-Diagrid @('org', 'use', $Organization)
 if ($ProjectName -notin (Get-Names @('project', 'list'))) {
     $arguments = @('project', 'create', $ProjectName, '--enable-managed-workflow', '--wait')
     if ($Region) { $arguments += @('--region', $Region) }
@@ -58,4 +66,4 @@ if ($AppId -notin (Get-Names @('app', 'list', '--project', $ProjectName))) {
 }
 
 Write-Host "Configured project $ProjectName and app $AppId."
-Write-Host "Run Aspire with: dotnet run --project AppHost -- --UseCatalyst=true --CatalystProject=$ProjectName --CatalystAppId=$AppId"
+Write-Host "Set Diagrid:Enabled=true in AppHost/appsettings.json and Diagrid:Organization=$Organization / Diagrid:Project=$ProjectName in AppHost user secrets, then run Aspire."

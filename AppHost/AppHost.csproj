@@ -6,10 +6,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsAspireHost>true</IsAspireHost>
+    <UserSecretsId>dapr-parallel-rerun-repro-apphost</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.AppHost" Version="13.3.5" />
     <PackageReference Include="CommunityToolkit.Aspire.Hosting.Dapr" Version="13.0.0" />
+    <PackageReference Include="Diagrid.Aspire.Hosting.Catalyst" Version="1.0.0" />
     <ProjectReference Include="../WorkflowService/WorkflowService.csproj" />
   </ItemGroup>
 </Project>
