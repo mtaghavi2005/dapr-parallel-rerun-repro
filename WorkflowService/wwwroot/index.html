@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Parallel rerun proof — plain Dapr</title>
+  <style>
+    body{font:16px system-ui;margin:40px auto;max-width:1150px;padding:0 20px;color:#202938;background:#f6f8fb}
+    h1{margin-bottom:8px}p{line-height:1.5}button{padding:12px 18px;margin:4px 10px 4px 0;cursor:pointer;border:1px solid #526784;border-radius:7px;background:white;font:inherit}
+    button:disabled{opacity:.45;cursor:default}table{border-collapse:collapse;width:100%;background:white}th,td{text-align:left;padding:12px;border-bottom:1px solid #dce1e8}
+    code,pre{font-size:13px;overflow-wrap:anywhere}pre{white-space:pre-wrap;background:white;padding:16px;border:1px solid #dce1e8}
+    .proof{background:#e4f5e9}.reused{background:#fff3c9}#status{padding:14px;background:#e7eefc;border-radius:7px}
+    a{color:#174eaa}td small{display:block;font-family:monospace;overflow-wrap:anywhere;margin-top:4px}
+    .workflow-diagram{margin:20px 0;padding:16px;background:white;border:1px solid #dce1e8;border-radius:10px;overflow-x:auto}
+    .workflow-diagram svg{display:block;width:100%;min-width:760px;height:auto}
+    .workflow-diagram figcaption{margin-top:8px;color:#526078;font-size:14px}
+    .workflow-node,.workflow-gateway{fill:white;stroke:#657997;stroke-width:2}
+    .workflow-wire{fill:none;stroke:#657997;stroke-width:2;marker-end:url(#flow-arrow)}
+    .workflow-diagram text{font-family:system-ui;fill:#202938;text-anchor:middle;font-size:16px}
+    .workflow-diagram .note{font-size:13px;fill:#526078}
+    .manual-rerun{margin:16px 0;padding:16px;border:1px solid #dce1e8;border-radius:8px;background:white}
+    .manual-rerun label{display:block;font-weight:600;margin-bottom:8px}
+    .manual-rerun input{width:140px;padding:11px;border:1px solid #526784;border-radius:7px;font:inherit}
+    .manual-rerun p{margin:8px 0 0;color:#526078;font-size:14px;overflow-wrap:anywhere}
+  </style>
+</head>
+<body>
+  <h1>Parallel rerun proof</h1>
+  <p>Plain Dapr Workflow + Aspire.</p>
+  <figure class="workflow-diagram">
+    <svg viewBox="0 0 1060 245" role="img" aria-labelledby="workflow-title workflow-description">
+      <title id="workflow-title">Parallel order workflow</title>
+      <desc id="workflow-description">Load request, then Validate and Inventory in parallel, join both branches, Charge, and Save. Save fails in the source run.</desc>
+      <defs><marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#657997" /></marker></defs>
+      <path class="workflow-wire" d="M175 125 H208" />
+      <path class="workflow-wire" d="M230 103 V57 H300" />
+      <path class="workflow-wire" d="M230 147 V187 H300" />
+      <path class="workflow-wire" d="M480 57 H550 V103" />
+      <path class="workflow-wire" d="M480 187 H550 V147" />
+      <path class="workflow-wire" d="M572 125 H640" />
+      <path class="workflow-wire" d="M795 125 H855" />
+      <rect class="workflow-node" x="20" y="90" width="155" height="70" rx="10" />
+      <text x="97" y="131">Load request</text>
+      <path class="workflow-gateway" d="M208 125 L230 103 L252 125 L230 147 Z" />
+      <path d="M221 125 H239 M230 116 V134" stroke="#657997" stroke-width="2" />
+      <rect class="workflow-node" x="300" y="25" width="180" height="65" rx="10" />
+      <text x="390" y="53">Validate</text><text class="note" x="390" y="74">slow</text>
+      <rect class="workflow-node" x="300" y="155" width="180" height="65" rx="10" />
+      <text x="390" y="183">Inventory</text><text class="note" x="390" y="204">fast</text>
+      <path class="workflow-gateway" d="M528 125 L550 103 L572 125 L550 147 Z" />
+      <path d="M541 125 H559 M550 116 V134" stroke="#657997" stroke-width="2" />
+      <rect class="workflow-node" x="640" y="90" width="155" height="70" rx="10" />
+      <text x="717" y="131">Charge</text>
+      <rect class="workflow-node" x="855" y="90" width="180" height="70" rx="10" />
+      <text x="945" y="119">Save</text><text class="note" x="945" y="142">Fails in source run</text>
+    </svg>
+    <figcaption>Validate and Inventory run in parallel. Charge waits for both branches to finish.</figcaption>
+  </figure>
+  <p>After the source fails, rerun from Inventory. Compare actual activity invocations with the dimmed nodes in Catalyst.</p>
+  <button id="start">1. Start process</button>
+  <button id="rerun" disabled>2. Rerun from Inventory</button>
+  <button id="compare" disabled>3. Compare execution evidence</button>
+  <button id="download" disabled>Download evidence JSON</button>
+  <div class="manual-rerun">
+    <label for="event-id">Rerun from a specific event ID</label>
+    <input id="event-id" type="number" min="0" step="1" list="event-options" placeholder="Event ID" disabled>
+    <datalist id="event-options"></datalist>
+    <button id="rerun-event" disabled>Rerun from event ID</button>
+    <p id="available-events">Start a process first. Available native scheduling events will appear after it fails.</p>
+  </div>
+  <p id="status" role="status">Ready. Open Aspire Traces and Structured logs alongside this page.</p>
+  <p id="ids"></p>
+  <table><thead><tr><th>Activity</th><th>Result provenance</th><th>Worker invocations in rerun</th><th>Invocation tokens</th></tr></thead><tbody id="rows"></tbody></table>
+  <p>A token is generated inside the activity worker body. Replaying an existing result preserves its token; executing again produces a new token.</p>
+  <p>In Aspire Structured logs, filter <code>ACTIVITY_EXECUTED</code> and the rerun instance. Its trace link opens the corresponding span.</p>
+  <details><summary>Raw evidence, including native source and rerun histories</summary><pre id="raw">No comparison yet.</pre></details>
+  <script>
+    const $ = id => document.getElementById(id);
+    let source, rerun, evidence, polling, canRerun = false;
+    async function api(path, method = 'GET', body) {
+      const response = await fetch(path, {method, headers:{'Content-Type':'application/json'}, body:body === undefined ? undefined : JSON.stringify(body)});
+      const text = await response.text();
+      if (!response.ok) throw new Error(text);
+      return text ? JSON.parse(text) : null;
+    }
+    function message(text) { $('status').textContent = text; }
+    function ids() { $('ids').textContent = `Source: ${source || '—'} | Rerun: ${rerun || '—'}`; }
+    function allowRerun(allowed) {
+      canRerun = allowed;
+      $('rerun').disabled = !allowed;
+      $('event-id').disabled = !allowed;
+      const value = $('event-id').value;
+      $('rerun-event').disabled = !allowed || value === '' || !Number.isInteger(Number(value)) || Number(value) < 0;
+    }
+    $('event-id').oninput = () => allowRerun(canRerun);
+    async function loadEvents() {
+      const history = await api(`/api/runs/${source}/history`);
+      const events = history.filter(event => event.eventType === 'TaskScheduled');
+      $('event-options').replaceChildren();
+      for (const event of events) {
+        const option = document.createElement('option'); option.value = event.eventId; option.label = event.activityName;
+        $('event-options').append(option);
+      }
+      $('available-events').textContent = 'Available events: ' + events.map(event => `${event.eventId} — ${event.activityName}`).join(' · ');
+    }
+    function watch(id, desired, done) {
+      clearInterval(polling);
+      polling = setInterval(async () => {
+        try {
+          const state = await api(`/api/runs/${id}`);
+          message(`Workflow ${id}: ${state.status}`);
+          if (state.status === desired) { clearInterval(polling); await done(); }
+          else if (['Failed','Terminated','Completed'].includes(state.status)) { clearInterval(polling); message(`Unexpected status ${state.status}; inspect Aspire logs.`); }
+        } catch(error) { clearInterval(polling); message(error.message); }
+      }, 1000);
+    }
+    $('start').onclick = async () => {
+      try {
+        clearInterval(polling); $('start').disabled = true; allowRerun(false); $('compare').disabled = true; $('download').disabled = true;
+        $('event-id').value = ''; $('event-options').replaceChildren(); $('available-events').textContent = 'Waiting for the process to fail.';
+        $('rows').replaceChildren(); $('raw').textContent = 'Waiting for comparison.'; rerun = null;
+        const result = await api('/api/runs','POST',{delaySeconds:5}); source = result.sourceInstanceId; ids();
+        message('Source running. Save will fail intentionally after both parallel branches finish.');
+        watch(source,'Failed',async () => { await loadEvents(); allowRerun(true); message('Process failed as intended. Rerun from Inventory or enter another event ID.'); });
+      } catch(error) { message(error.message); $('start').disabled = false; }
+    };
+    async function startRerun(eventId) {
+      try {
+        allowRerun(false); $('start').disabled = true; $('compare').disabled = true; $('download').disabled = true;
+        $('rows').replaceChildren(); $('raw').textContent = 'Waiting for comparison.';
+        const result = eventId === undefined
+          ? await api(`/api/runs/${source}/rerun-inventory`,'POST')
+          : await api(`/api/runs/${source}/rerun`,'POST',{eventId});
+        rerun = result.rerunInstanceId; ids();
+        message(`Rerun accepted at event ${result.eventId}: ${result.activityName}.`);
+        watch(rerun,'Completed',() => { $('compare').disabled = false; message('Rerun completed. Compare the results.'); });
+      } catch(error) { message(error.message); $('start').disabled = false; allowRerun(true); }
+    }
+    $('rerun').onclick = () => startRerun();
+    $('rerun-event').onclick = () => startRerun(Number($('event-id').value));
+    $('compare').onclick = async () => {
+      try {
+        evidence = await api(`/api/compare?source=${source}&rerun=${rerun}`); $('rows').replaceChildren();
+        for (const row of evidence.rows) {
+          const tr = document.createElement('tr'); tr.className = row.resultWasProducedInRerun ? 'proof' : 'reused';
+          for (const value of [row.activityName, row.resultWasProducedInRerun ? 'Executed in rerun' : 'Reused source result', row.observedWorkerInvocationsInRerun, `Source: ${row.sourceInvocationId || '(failed)'}\nOutput: ${row.rerunOutputInvocationId}`]) {
+            const td = document.createElement('td'); td.textContent = value; tr.append(td);
+          }
+          $('rows').append(tr);
+        }
+        $('raw').textContent = JSON.stringify(evidence,null,2); $('download').disabled = false; $('start').disabled = false; allowRerun(true);
+        message('Evidence loaded. Compare Validate’s new invocation with its appearance in Catalyst’s graph.');
+      } catch(error) { message(error.message); }
+    };
+    $('download').onclick = () => {
+      const url = URL.createObjectURL(new Blob([JSON.stringify(evidence,null,2)],{type:'application/json'}));
+      const link = document.createElement('a'); link.href = url; link.download = `${rerun}-evidence.json`; link.click(); URL.revokeObjectURL(url);
+    };
+  </script>
+</body>
+</html>

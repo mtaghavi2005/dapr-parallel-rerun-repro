@@ -1,0 +1,40 @@
+@baseUrl = http://localhost:5260
+
+### 1. Start the source; Save intentionally fails after both parallel branches finish
+POST {{baseUrl}}/api/runs
+Content-Type: application/json
+
+{ "delaySeconds": 5 }
+
+> {% client.global.set("sourceId", response.body.sourceInstanceId); %}
+
+### 2. Repeat until status is Failed
+GET {{baseUrl}}/api/runs/{{sourceId}}
+
+### 3. Inspect source worker executions (Validate schedule before Inventory, completes later)
+GET {{baseUrl}}/api/executions?instanceId={{sourceId}}
+
+### 4. Inspect native history, including completion-to-schedule references
+GET {{baseUrl}}/api/runs/{{sourceId}}/history
+
+### 5. Rerun from Inventory's actual native scheduling event; no input override
+POST {{baseUrl}}/api/runs/{{sourceId}}/rerun-inventory
+
+> {% client.global.set("rerunId", response.body.rerunInstanceId); %}
+
+### 6. Repeat until status is Completed
+GET {{baseUrl}}/api/runs/{{rerunId}}
+
+### 7. Prove which activity results were reused and which were newly produced
+GET {{baseUrl}}/api/compare?source={{sourceId}}&rerun={{rerunId}}
+
+### 8. Worker executions under the new instance ID
+GET {{baseUrl}}/api/executions?instanceId={{rerunId}}
+
+### Optional: rerun from another native scheduling event (replace 0 with a listed ID)
+POST {{baseUrl}}/api/runs/{{sourceId}}/rerun
+Content-Type: application/json
+
+{ "eventId": 0 }
+
+> {% client.global.set("rerunId", response.body.rerunInstanceId); %}
