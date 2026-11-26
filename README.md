@@ -47,6 +47,10 @@ dotnet run --project AppHost --launch-profile http --no-build -- \
 
 Use the same demo page. Aspire runs the local worker through `diagrid dev run`, without a local sidecar. Open the rerun instance in Catalyst and compare the graph with the worker’s execution evidence. The reported case is Validate appearing dimmed despite executing again; confirm the graph behavior in Catalyst itself.
 
+![Catalyst graph after rerun from Inventory](docs/catalyst-rerun-graph.png)
+
+Reported graph: Validate appears dimmed. Compare this with its actual worker invocation in Aspire.
+
 ## Verify and share evidence
 
 With the worker running:
