@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1060 245" role="img" aria-labelledby="workflow-title workflow-description">
+      <style>
+        .workflow-node,.workflow-gateway{fill:white;stroke:#657997;stroke-width:2}
+        .workflow-wire{fill:none;stroke:#657997;stroke-width:2;marker-end:url(#flow-arrow)}
+        text{font-family:system-ui,sans-serif;fill:#202938;text-anchor:middle;font-size:16px}
+        .note{font-size:13px;fill:#526078}
+      </style>
+      <rect width="1060" height="245" fill="white" />
+      <title id="workflow-title">Parallel order workflow</title>
+      <desc id="workflow-description">Load request, then Validate and Inventory in parallel, join both branches, Charge, and Save. Save fails in the source run.</desc>
+      <defs><marker id="flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#657997" /></marker></defs>
+      <path class="workflow-wire" d="M175 125 H208" />
+      <path class="workflow-wire" d="M230 103 V57 H300" />
+      <path class="workflow-wire" d="M230 147 V187 H300" />
+      <path class="workflow-wire" d="M480 57 H550 V103" />
+      <path class="workflow-wire" d="M480 187 H550 V147" />
+      <path class="workflow-wire" d="M572 125 H640" />
+      <path class="workflow-wire" d="M795 125 H855" />
+      <rect class="workflow-node" x="20" y="90" width="155" height="70" rx="10" />
+      <text x="97" y="131">Load request</text>
+      <path class="workflow-gateway" d="M208 125 L230 103 L252 125 L230 147 Z" />
+      <path d="M221 125 H239 M230 116 V134" stroke="#657997" stroke-width="2" />
+      <rect class="workflow-node" x="300" y="25" width="180" height="65" rx="10" />
+      <text x="390" y="53">Validate</text><text class="note" x="390" y="74">slow</text>
+      <rect class="workflow-node" x="300" y="155" width="180" height="65" rx="10" />
+      <text x="390" y="183">Inventory</text><text class="note" x="390" y="204">fast</text>
+      <path class="workflow-gateway" d="M528 125 L550 103 L572 125 L550 147 Z" />
+      <path d="M541 125 H559 M550 116 V134" stroke="#657997" stroke-width="2" />
+      <rect class="workflow-node" x="640" y="90" width="155" height="70" rx="10" />
+      <text x="717" y="131">Charge</text>
+      <rect class="workflow-node" x="855" y="90" width="180" height="70" rx="10" />
+      <text x="945" y="119">Save</text><text class="note" x="945" y="142">Fails in source run</text>
+    </svg>
